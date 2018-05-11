@@ -4,10 +4,11 @@
 Esta classe deve conter todas as suas implementações relevantes para seu filtro de partículas
 """
 
-from pf import Particle, create_particles
+from pf import Particle, create_particles, draw_random_sample
 import numpy as np
 import inspercles # necessário para o a função nb_lidar que simula o laser
 import math
+from scipy.stats import norm
 
 
 largura = 775 # largura do mapa
@@ -20,7 +21,7 @@ robot = Particle(largura/2, altura/2, math.pi/4, 1.0)
 # Nuvem de particulas
 particulas = []
 
-num_particulas = 100
+num_particulas = 500
 
 p_h = 1/num_particulas
 
@@ -42,11 +43,27 @@ movimentos_longos = [[-10, -10, 0], [-10, 10, 0], [-10,0,0], [-10, 0, 0],
 # Lista curta
 movimentos_curtos = [[-10, -10, 0], [-10, 10, 0], [-10,0,0], [-10, 0, 0]]
 
-movimentos = movimentos_longos
+movimentos_relativos = [[0, -math.pi/3],[10, 0],[10, 0], [10, 0], [10, 0],[15, 0],[15, 0],[15, 0],[0, -math.pi/2],[10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [0, -math.pi/2], 
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [0, -math.pi/2], 
+					   [10,0], [0, -math.pi/4], [10,0], [10,0], [10,0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0],
+					   [10,0], [10, 0], [10, 0], [10, 0], [10, 0], [10, 0]]
 
 
 
-def cria_particulas(minx=0, miny=0, maxx=largura, maxy=altura, n_particulas=200):
+movimentos = movimentos_relativos
+
+
+
+def cria_particulas(minx=0, miny=0, maxx=largura, maxy=altura, n_particulas=num_particulas):
 	"""
 		Cria uma lista de partículas distribuídas de forma uniforme entre minx, miny, maxx e maxy
 	"""
@@ -69,16 +86,16 @@ def move_particulas(particulas, movimento):
 		Você não precisa mover o robô. O código fornecido pelos professores fará isso
 		
 	"""
-
 	for i in particulas:
 		i.move_relative(movimento)
-		dmov = np.random.normal(0, 1.5)
-		dtheta = np.random.normal(0, math.pi/180)
+		dmov = np.random.normal(0, 3)
+		dtheta = np.random.normal(0, math.radians(2))
 		i.move_relative([dmov, dtheta])
 
 	return particulas
 	
 def leituras_laser_evidencias(robot, particulas):
+	
 	"""
 		Realiza leituras simuladas do laser para o robo e as particulas
 		Depois incorpora a evidência calculando
@@ -91,23 +108,89 @@ def leituras_laser_evidencias(robot, particulas):
 		Você vai precisar calcular para o robo
 		
 	"""
-	lc = []
-	sigma = 1
-	leitura_particulas = []
+
+
+
+	sig = 8
+	soma_pdh = 0 
 	leitura_robo = inspercles.nb_lidar(robot, angles)
-	if controle == 0:
-		controle = 1
-		for i in range(particulas):
-			uma_leitura = inspercles.nb_lidar(particulas[i], angles)
-			leitura_particulas.append(uma_leitura)
-			for d in uma_leitura:
-				lc.append(norm.pdf(uma_leitura[d],loc=leitura_robo[d],scale=sigma))
-			p_d_h = np.prod(lc)
-			particulas[i].w = p_d_h*p_h
+
+	for i in particulas:
+		leitura_particula = inspercles.nb_lidar(i, angles)
+		pdh = 0
+
+		for d in leitura_particula:
+		  pdh += norm.pdf(leitura_particula[d], loc = leitura_robo[d], scale = sig)
+
+		particles = i.w * pdh 
+		i.w = particles
+		soma_pdh += particles
 
 		
+	alpha = 1/soma_pdh
+		  
+	for i in particulas:  
+		i.w = i.w * alpha
+		
+
 
 '''
+	leitura_robo = inspercles.nb_lidar(robot, angles)
+	sigma = 8
+	somap_d_h = 0
+	lc = []
+
+	for i in particulas:
+		leitura_particula = inspercles.nb_lidar(i,angles)
+
+		pdh = 0
+		for d in leitura_particula:
+			pdh += norm.pdf(leitura_particula[d], loc = leitura_robo[d], scale = sigma)
+
+		i.w *= pdh
+		somap_d_h += i.w
+
+	alpha = 1/somap_d_h
+
+	for i in range(len(particulas)):
+		particulas[i].w *= alpha
+
+
+
+'''
+
+'''
+
+	lc = []
+	p_d_h =0
+	soma_pdh = 0
+	sigma = 6
+	leitura_particulas = []
+	
+
+	for i in particulas:
+		uma_leitura = inspercles.nb_lidar(i, angles)
+
+		p_d_h =0
+
+
+		#leitura_particulas.append(uma_leitura)
+
+
+		for d in uma_leitura:
+			p_d_h += norm.pdf((leitura_robo[d]-uma_leitura[d]),0,sigma)
+
+		soma_pdh += p_d_h
+
+		lc.append(p_d_h)
+
+	alfa = 1/soma_pdh
+	for i in range(len(particulas)):	
+		particulas[i].w = lc[i]*alfa
+
+
+		
+-----------------------------
 	if controle = 1:
 		for i in leitura_particulas.itervalues():
 		norm.pdf()
@@ -132,12 +215,13 @@ def reamostrar(particulas, n_particulas = num_particulas):
 		
 		Use 1/n ou 1, não importa desde que seja a mesma
 	"""
-	particulas_pesos = [np.round(p.w, decimals=3) for p in particulas]
+	particulas_pesos = [p.w for p in particulas]
 
-	novas_particulas = draw_random_sample(particulas, particulas_pesos, 10)
+	novas_particulas = draw_random_sample(particulas, particulas_pesos, num_particulas)
 	for i in novas_particulas:
-		i.x += np.random.normal(0, 4)
-		i.y += np.random.normal(0, math.pi/45)
+		i.x += np.random.normal(0, 12)
+		i.y += np.random.normal(0, 12)
+		i.theta += np.random.normal(0, math.radians(11))
 
 
 	for p in novas_particulas:
@@ -146,7 +230,8 @@ def reamostrar(particulas, n_particulas = num_particulas):
 
 
 
-	return particulas
+
+	return novas_particulas
 
 
 	
